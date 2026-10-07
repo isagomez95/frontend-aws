@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplicación Web Segura - Zero Trust</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 350px; }
+        h2 { color: #1a252f; margin-bottom: 20px; }
+        input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background-color: #2c3e50; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        button:hover { background-color: #34495e; }
+        .hidden { display: none; }
+        .alert { padding: 10px; margin-top: 10px; border-radius: 5px; font-size: 14px; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .success { background-color: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="card" id="login-card">
+        <h2>Iniciar Sesión</h2>
+        <input type="text" id="usuario" placeholder="Usuario (eloisa)">
+        <input type="password" id="password" placeholder="Contraseña (123456)">
+        <button onclick="login()">Ingresar</button>
+        <div id="login-msg" class="alert hidden"></div>
+    </div>
+
+    <div class="card hidden" id="dashboard-card">
+        <h2>Dashboard Protegido</h2>
+        <p id="dash-text">Cargando datos seguros...</p>
+        <button onclick="logout()">Cerrar Sesión</button>
+    </div>
+
+    <script>
+        // Cambiar por la IP privada del Backend o el proxy Nginx
+        const API_URL = '/api'; 
+
+        async function login() {
+            const usuario = document.getElementById('usuario').value;
+            const password = document.getElementById('password').value;
+            const msg = document.getElementById('login-msg');
+
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usuario, password })
+                });
+                const data = await res.json();
+
+                if (res.ok && data.token) {
+                    localStorage.setItem('jwt_token', data.token);
+                    cargarDashboard();
+                } else {
+                    msg.textContent = data.mensaje || 'Error de autenticación';
+                    msg.className = 'alert error';
+                }
+            } catch (err) {
+                msg.textContent = 'Error al conectar con la API Backend';
+                msg.className = 'alert error';
+            }
+        }
+
+        async function cargarDashboard() {
+            const token = localStorage.getItem('jwt_token');
+            if (!token) return logout();
+
+            try {
+                const res = await fetch(`${API_URL}/dashboard`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    document.getElementById('login-card').classList.add('hidden');
+                    document.getElementById('dashboard-card').classList.remove('hidden');
+                    document.getElementById('dash-text').innerHTML = `<strong>${data.mensaje}</strong><br><br>${data.data}`;
+                } else {
+                    logout();
+                }
+            } catch (err) {
+                logout();
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('jwt_token');
+            document.getElementById('login-card').classList.remove('hidden');
+            document.getElementById('dashboard-card').classList.add('hidden');
+        }
+
+        // Auto-login si ya existe token válido
+        if (localStorage.getItem('jwt_token')) cargarDashboard();
+    </script>
+</body>
+</html>
